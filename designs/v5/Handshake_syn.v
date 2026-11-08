@@ -1,11 +1,6 @@
-// 4-phase handshake synchronizer, clk1 (sclk) -> clk2 (dclk) -- FAST-ACK variant.
-// The acknowledge is the (already synchronised) request itself: dack = dreq, so the destination answers
-// one dclk cycle earlier on both the rising and the falling phase.  The destination register is loaded one
-// cycle later from the source data register, which stays stable until the next transfer is accepted
-// (>= one complete 4-phase round trip later), so data stability still holds.
-// NOTE: dbusy is not used (back-pressure is not possible with a combinational acknowledge);
-//       CLK_2_MODULE consumes every word faster than the handshake can deliver the next one.
-// NOTE: not verified with Jasper CDC (no tool available) -- see docs/results.md.
+// 4-phase handshake synchronizer, clk1 (sclk) -> clk2 (dclk), structure of Fig.5:
+// a source data register (loaded when a transfer is accepted) and a destination register
+// (loaded when the destination acknowledges).
 module Handshake_syn #(parameter WIDTH = 32) (
     input              sclk,
     input              dclk,
@@ -14,7 +9,7 @@ module Handshake_syn #(parameter WIDTH = 32) (
     input              sready,
     input  [WIDTH-1:0] din,
     output             sidle,
-    output             sdone,   // unused by this variant (kept for a common top level)
+    output             sdone,   // unused by V2 (kept for a common top level)
     // destination side (dclk)
     input              dbusy,
     output reg         dvalid,
@@ -22,15 +17,13 @@ module Handshake_syn #(parameter WIDTH = 32) (
 );
     reg  sreq;
     wire dreq;
-    wire dack;
+    reg  dack;
     wire sack;
-    reg  dreq_q;
     reg  [WIDTH-1:0] data;
 
     NDFF_syn u_req_sync (.D(sreq), .clk(dclk), .rst_n(rst_n), .Q(dreq));
     NDFF_syn u_ack_sync (.D(dack), .clk(sclk), .rst_n(rst_n), .Q(sack));
 
-    assign dack  = dreq;
     assign sidle = ~sreq & ~sack;
     assign sdone = sack;
 
@@ -48,13 +41,18 @@ module Handshake_syn #(parameter WIDTH = 32) (
 
     always @(posedge dclk or negedge rst_n) begin
         if (!rst_n) begin
-            dreq_q <= 1'b0;
+            dack   <= 1'b0;
             dvalid <= 1'b0;
             dout   <= {WIDTH{1'b0}};
         end else begin
-            dreq_q <= dreq;
-            dvalid <= dreq & ~dreq_q;
-            if (dreq & ~dreq_q) dout <= data;
+            dvalid <= 1'b0;
+            if (dreq & ~dack & ~dbusy) begin
+                dack   <= 1'b1;
+                dvalid <= 1'b1;
+                dout   <= data;
+            end else if (~dreq) begin
+                dack <= 1'b0;
+            end
         end
     end
 endmodule

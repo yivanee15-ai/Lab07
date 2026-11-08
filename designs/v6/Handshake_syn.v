@@ -5,8 +5,6 @@
 // (>= one complete 4-phase round trip later), so data stability still holds.
 // NOTE: dbusy is not used (back-pressure is not possible with a combinational acknowledge);
 //       CLK_2_MODULE consumes every word faster than the handshake can deliver the next one.
-// The source control (sreq / source data register) runs on the FALLING edge of sclk: the request is
-// raised / dropped half a clk1 cycle earlier than with a rising-edge register (saves 7 ns per phase).
 // NOTE: not verified with Jasper CDC (no tool available) -- see docs/results.md.
 module Handshake_syn #(parameter WIDTH = 32) (
     input              sclk,
@@ -36,7 +34,7 @@ module Handshake_syn #(parameter WIDTH = 32) (
     assign sidle = ~sreq & ~sack;
     assign sdone = sack;
 
-    always @(negedge sclk or negedge rst_n) begin
+    always @(posedge sclk or negedge rst_n) begin
         if (!rst_n) begin
             sreq <= 1'b0;
             data <= {WIDTH{1'b0}};

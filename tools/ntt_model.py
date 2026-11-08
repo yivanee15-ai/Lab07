@@ -71,6 +71,57 @@ def front4_consts(gmb):
     return c1, c2, c3
 
 
+def front_matrix(gmb, r):
+    """C[k][i]: y[(128>>r)*k + p] = sum_i C[k][i] * x[p + (128>>r)*i]  for the first r CT stages."""
+    n = 1 << r
+    stride = 128 // n
+    C = [[0] * n for _ in range(n)]
+    for i in range(n):
+        x = [0] * 128
+        x[stride * i] = 1
+        y = x[:]
+        t, m = 128, 1
+        for _ in range(r):
+            ht = t // 2
+            j1 = 0
+            for b in range(m):
+                s_ = gmb[m + b]
+                for j in range(j1, j1 + ht):
+                    u = y[j]; v = modq_mul(y[j + ht], s_)
+                    y[j] = (u + v) % Q; y[j + ht] = (u - v) % Q
+                j1 += t
+            t, m = ht, m * 2
+        for k in range(n):
+            C[k][i] = y[stride * k]
+    return C
+
+
+def front_r(x, gmb, r):
+    n = 1 << r
+    stride = 128 // n
+    C = front_matrix(gmb, r)
+    y = [0] * 128
+    for k in range(n):
+        for p in range(stride):
+            y[stride * k + p] = sum(C[k][i] * x[p + stride * i] for i in range(n)) % Q
+    return y
+
+
+def stages_r(x, gmb, r):
+    x = list(x)
+    t, m = 128, 1
+    for _ in range(r):
+        ht = t // 2; j1 = 0
+        for b in range(m):
+            s_ = gmb[m + b]
+            for j in range(j1, j1 + ht):
+                u = x[j]; v = modq_mul(x[j + ht], s_)
+                x[j] = (u + v) % Q; x[j + ht] = (u - v) % Q
+            j1 += t
+        t, m = ht, m * 2
+    return x
+
+
 def front4(x, gmb):
     """first two stages computed with the radix-4 formula (self check of the idea)"""
     c1, c2, c3 = front4_consts(gmb)
@@ -111,4 +162,9 @@ if __name__ == "__main__":
         x = [random.randrange(16) for _ in range(N)]
         assert front4(x, g) == two_stages(x, g), "radix-4 front end formula mismatch"
     print("radix-4 front end (stage 1+2 as LUT sums) == two radix-2 stages")
+    for r in (2, 3, 4):
+        for _ in range(20):
+            x = [random.randrange(16) for _ in range(N)]
+            assert front_r(x, g, r) == stages_r(x, g, r), "radix-%d front end mismatch" % (1 << r)
+    print("radix-4/8/16 raw front ends == first 2/3/4 radix-2 stages")
     print("model OK: spec algorithm == naive polynomial evaluation (assumed GMb)")
