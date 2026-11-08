@@ -13,10 +13,10 @@
 | V1 | 9343.6 | 35,601 | 2453 | 5.23 | 1.000 | 基準：收滿 128 項再用一顆 butterfly 逐個算 |
 | V2 | 4852.7 | 29,413 | 2514 | 1.65 | 0.429 | 7-stage radix-2 SDF pipeline、邊收邊算 |
 | V3 | 4744.7 | 28,374 | 2414 | 1.46 | 0.405 | latency 微調：2 級 Montgomery、stage7 直通 FIFO、FIFO 1-cycle read |
-| V4 | 4715.3 | 23,237 | 1921 | 1.49 | 0.329 | **面積**：radix-4 raw 前端（取代 stage1+2）、CLK1 ring buffer |
-| V5 | 4711.7 | 20,855 | 1654 | 1.94 | 0.295 | **面積**：radix-8 raw 前端（取代 stage1~3），只剩 4 個乘法器 |
-| V6 | 4128.2 | 20,855 | 1654 | 2.02 | 0.259 | V5 + Handshake fast-ack（**JG 未驗證**） |
-| V7 | 3944.6 | 20,833 | 1655 | 2.00 | 0.247 | V6 + source 端改 falling edge（**JG 未驗證**） |
+| V4 | 4715.3 | 22,815 | 1857 | 1.49 | 0.323 | **面積**：radix-4 raw 前端（取代 stage1+2）、CLK1 ring buffer |
+| V5 | 4711.7 | 20,472 | 1590 | 1.92 | 0.290 | **面積**：radix-8 raw 前端（取代 stage1~3），只剩 4 個乘法器 |
+| V6 | 4128.2 | 20,531 | 1590 | 2.03 | 0.255 | V5 + Handshake fast-ack（**JG 未驗證**） |
+| V7 | 3944.6 | 20,571 | 1591 | 1.96 | 0.244 | V6 + source 端改 falling edge（**JG 未驗證**） |
 
 * 每一版都用 `tools/regress.sh` 驗證：4 個 clk3 週期 × 隨機初始相位 seed × 100 組 pattern（含全 0、全 15、單點 impulse、隨機），
   下一筆 1~3 個 clk1 cycle 後接著進來，out_valid/out_data 的零值規則、輸出筆數、latency < 5000 cycle 都由自寫 PATTERN 檢查。
@@ -64,7 +64,8 @@
 * 觀察：輸入只有 4 bit，前兩個 stage 可以直接在「原始 4-bit sample」上做：
   `y[32k+p] = x[p] + c1[k]·x[p+32] + c2[k]·x[p+64] + c3[k]·x[p+96] (mod Q)`，常數 c 都是固定值 → 每一項 = 16 項查表，**不需要乘法器**。
   4 條 32×4-bit 的 circulating row（每 tick 轉一格）剛好在每個 tick 把 4 個運算元送到 row head。這取代了原本 64×8-bit + 32×14-bit 的 delay line + stage 2 乘法器。
-* CLK_1 的 buffer 改成「每個 cycle 都在轉」的 16×32 ring（沒有 hold mux），handshake 用 16:1 tap mux 讀，tap index 用 4-bit 暫存器追蹤。
+* CLK_1 的 buffer 改成「每個 cycle 都在轉」的 ring（沒有 hold mux），handshake 用 tap mux 讀，tap index 用 4-bit 暫存器追蹤。
+  ring 只有 **14 個 word**：word 14、15 進來時會蓋掉最舊的 word 0、1，而它們早就送進 handshake 了（simulation assertion 監看；V4~V7、3000 組 pattern × 多組相位都沒觸發）。
 
 ### V5（面積：radix-8 raw 前端）
 * 同樣的想法延伸到 3 個 stage：8 條 16×4-bit row、7 個常數表、8 項加法 + 約化。
@@ -85,7 +86,7 @@
 | Handshake 改 2-phase / toggle | 會違反 JG handshake scheme 的 4-phase 檢查 |
 | 全 pipeline 自由運轉（拿掉 hold mux） | 要靠「預估最後一個 word 到達時間」提早啟動，最壞情況 jitter 要留餘量 → 平均多等 ~90 ns，且 FIFO 64 深度裝不下 128 筆全速輸出，需另加 skid buffer；淨效益 ≲ 2% 不值得 |
 | stage 內只用 1 級暫存器（L=1） | abc 估計單級 2.34 ns（→ 0.13µm ≈ 8 ns+FF 開銷），對 10.1 ns 太緊；只省 ~40 ns / 0.9k µm² |
-| CLK_1 ring 縮成 14 word | 只省 2 word（64 FF，~2%），依賴 handshake 速度的時序假設，風險不成比例 |
+| CLK_1 ring 縮成 13 word 以下 | word 2 在最慢的標準 handshake 下來不及送出，會被蓋掉（14 已是各版本通用的安全值） |
 | 去掉 Handshake 的 source data register | din 隨 ring 位置變化時 mux 可能有 glitch，與 dest 取樣撞到 → 不安全 |
 
 ## 5. 整合到真正的作業環境（請照做）

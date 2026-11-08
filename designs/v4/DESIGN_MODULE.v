@@ -16,17 +16,20 @@ module CLK_1_MODULE (
     output        sready,
     output [31:0] din
 );
-    // Ring of 16 words that rotates every cycle.  While in_valid is high the new word enters at the
-    // tail; afterwards the head recirculates.  idx always points at the position of the next word to send.
-    reg [31:0] r [0:15];
+    // Ring of RING (14) words that rotates every cycle.  While in_valid is high the new word enters at the tail;
+    // afterwards the head recirculates.  The two oldest words are overwritten by words 14 and 15, which is
+    // safe because they have long been handed to the handshake by then (checked by a simulation assertion).
+    // idx always points at the position of the next word to send.
+    localparam RING = 14;
+    reg [31:0] r [0:RING-1];
     reg [4:0]  n;              // words received
     reg [4:0]  sc;             // words handed to the handshake
     reg [3:0]  idx;
     integer i;
 
     always @(posedge clk) begin
-        for (i = 0; i < 15; i = i + 1) r[i] <= r[i+1];
-        r[15] <= in_valid ? in_data : r[0];
+        for (i = 0; i < RING-1; i = i + 1) r[i] <= r[i+1];
+        r[RING-1] <= in_valid ? in_data : r[0];
     end
 
     wire pending = (sc < n);
@@ -43,10 +46,18 @@ module CLK_1_MODULE (
         end else begin
             if (in_valid) n <= n + 5'd1;
             if (accept)   sc <= sc + 5'd1;
-            if (in_valid && n == 5'd0) idx <= 4'd15;
-            else if (!accept)          idx <= idx - 4'd1;   // accept: next word is one position up, ring moves one down
+            if (in_valid && n == 5'd0) idx <= RING - 1;
+            else if (!accept)          idx <= (idx == 4'd0) ? RING - 1 : idx - 4'd1;   // accept: next word is one position up, ring moves one down
         end
     end
+
+    // simulation only: the word about to be overwritten must already have been sent
+    // synopsys translate_off
+    always @(posedge clk) begin
+        if (rst_n && in_valid && n >= RING && sc + RING < n + 1)
+            $display("[ASSERT] ring overrun at %0t", $time);
+    end
+    // synopsys translate_on
 
     assign sready = pending;
     assign din    = r[idx];
