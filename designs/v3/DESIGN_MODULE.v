@@ -1,14 +1,11 @@
-// V3 : latency optimised SDF design (V2 + 2-level pipelined Montgomery stage, no normalisation step,
-//      stage 7 feeds the FIFO combinationally, 1 cycle FIFO read latency).
-// (V2 notes follow)
-//  CLK_1 : 16-word shift-register buffer, handshake transfers start as soon as word 0 arrives.
-//  CLK_2 : 7-stage radix-2 SDF (single-path delay feedback) NTT pipeline.  All stages are
-//          clocked by one global "advance" enable; the stream position of every stage is a
-//          pure function of a global tick counter g, so no per-stage valid bits are needed.
-//          Stage 1 needs no multiplier (input coefficients are 4 bit -> 16 entry LUT) and keeps
-//          the raw 4+4 bit pairs; stages 2..7 contain a 2-cycle Montgomery multiplier.
-//          The first output leaves the pipeline a few ticks after the last input sample.
-//  CLK_3 : pop the FIFO and align out_valid / out_data.
+// V3 : latency tuned SDF design
+//  * CLK_1 : 16 word shift register buffer, the handshake starts as soon as word 0 is in.
+//  * CLK_2 : 7 stage radix-2 SDF NTT pipeline, one global "advance" enable, stage position is a pure
+//            function of a global tick counter g.  Stage 1 uses a 16-entry LUT (4 bit inputs) and keeps
+//            the raw 4+4 bit pairs; stages 2..7 are 2-level pipelined Montgomery butterflies (Q = 3*2^12+1,
+//            no normalisation step, 3-way correction in the butterfly); stage 7 feeds the FIFO directly.
+//  * FIFO  : combinational empty flag, SRAM addressed with the next head pointer (1 cycle read latency).
+//  * CLK_3 : pop the FIFO, out_valid = pop delayed by one cycle.
 
 // ------------------------------------------------------------------ CLK_1
 module CLK_1_MODULE (
@@ -517,7 +514,7 @@ module SDF_STAGE #(
     wire [15:0] d2 = d + {1'd0, Q, 1'd0};
     wire [13:0] dif = (!d[15]) ? d[13:0] : (!d1[15]) ? d1[13:0] : d2[13:0];
 
-    // phase 0 : the (normalised) pass-through sample goes into the delay line, the stored
+    // phase 0 : the (normalised) unmultiplied sample goes into the delay line, the stored
     //           difference leaves; phase 1 : butterfly
     wire [13:0] zn   = (z >= Q) ? z - Q : z;
     wire [13:0] sr_in = phi_b ? dif : zn;

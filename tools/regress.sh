@@ -14,5 +14,5 @@ for d in $DESIGNS; do
       if [ "$p" = "20.7" ] && [ -z "$lat" ]; then lat=$(echo "$out" | grep LATENCY_NS | sed 's/.*avg=\([0-9.]*\).*/\1/'); fi
     done
   done
-  [ $ok = 1 ] && echo "$d : PASS  (latency @clk3=20.7ns avg = $lat ns)" || echo "$d : FAIL"
+  [ $ok = 1 ] && echo "$d : PASS  (avg latency @clk3=20.7ns = $lat clk3 cycles)" || echo "$d : FAIL"
 done
