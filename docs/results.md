@@ -29,12 +29,15 @@
 
 ## 2. latency 組成（clk3 = 20.7 ns）
 
-| 項目 | V1 | V2 | V3 | V4/V5 | V6 | V7 |
-|---|---|---|---|---|---|---|
-| in_valid 落下 → 最後一個 word 進 clk2（Handshake 尾巴） | ~2400 | 1842 | 1842 | 1842 | ~1160 | 1085 |
-| 最後一個 word → 第一筆結果寫入 FIFO（NTT pipeline） | ~4400 | 263 | 192 | 175 | 175 | 151 |
-| 寫入 FIFO → out_valid（FIFO 同步） | ~110 | 106 | 53 | 53~55 | 53 | 65 |
-| 128 筆輸出 × 20.7 | 2650 | 2650 | 2650 | 2650 | 2650 | 2650 |
+| 項目 (ns) | V1 | V2 | V3 | V4 | V5 | V6 | V7 |
+|---|---|---|---|---|---|---|---|
+| in_valid 落下 → 最後一個 word 進 clk2（Handshake 尾巴） | 2024 | 1842 | 1842 | 1842 | 1842 | 1256 | 1085 |
+| 最後一個 word → 第一筆結果寫入 FIFO（NTT 尾巴） | 4535 | 263 | 192 | 172 | 152 | 151 | 151 |
+| 寫入 FIFO → out_valid（FIFO 同步） | 103 | 107 | 53 | 53 | 52 | 58 | 64 |
+| 128 筆輸出 × 20.7 | 2650 | 2650 | 2650 | 2650 | 2650 | 2650 | 2650 |
+| 合計（`run_mon.sh`，2 筆 pattern 平均） | 9341 | 4862 | 4739 | 4725 | 4698 | 4128 | 3943 |
+
+（V1 的 handshake 尾巴較長是因為它要等 16 個 word 收滿才開始送。）
 
 `2650 ns` 的輸出時間與「16 個 word 各做一次 4-phase handshake」是 spec 決定的下限，其餘都是設計能動的部分。
 
@@ -100,7 +103,9 @@
 3. 交作業的三個檔案 = 選定版本資料夾裡的 `DESIGN_MODULE.v`、`Handshake_syn.v`、`FIFO_syn.v`（`NDFF_syn / NDFF_BUS_syn` 用 TA 的）。
 4. 必跑：`01_run_vcs_rtl`（4 種 clk3）→ `01_run_dc_shell`（slack ≥ 0、無 latch/error）→ `02_run_pt` → `03_run_vcs_gate` → `05_JG/01_run_jg`。
    若 DC 的 clk2 路徑不過：先把 `F8_PIPE` 設 1（FRONT8 多一級）。
-5. SRAM 假設為 `DUAL_64X16X1BM1`，port A 讀（CKA=rclk）、port B 寫（CKB=wclk），`WEAN/WEBN` active-low；
+5. 需要留意的結構風險（V3 起）：`FIFO_syn` 的 `rempty` 是組合邏輯（`rptr == wptr_s`）、SRAM 讀位址用 next-head pointer。
+   若 Jasper / DC 對這兩點有意見，改回「registered rempty、位址 = rbin」即可（各多 1 個 clk3 cycle ≈ +21 ns latency，功能不變）。
+6. SRAM 假設為 `DUAL_64X16X1BM1`，port A 讀（CKA=rclk）、port B 寫（CKB=wclk），`WEAN/WEBN` active-low；
    FIFO 讀位址用 next-head，所以同位址讀寫時 SRAM 的 `MEM_Warning`（spec 已列為可接受）可能出現。
 
 ## 6. 復現指令
