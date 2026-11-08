@@ -8,4 +8,4 @@ iverilog -g2012 -o sim.vvp -DCLK3_PERIOD=$P -DNPAT=$N \
   $ROOT/00_TESTBED/TESTBED.v $ROOT/00_TESTBED/PATTERN.v $ROOT/common/NTT_TOP.v \
   $ROOT/common/NDFF_syn.v $ROOT/common/NDFF_BUS_syn.v $ROOT/04_MEM/DUAL_64X16X1BM1.v \
   $ROOT/$D/DESIGN_MODULE.v $ROOT/$D/Handshake_syn.v $ROOT/$D/FIFO_syn.v || exit 1
-vvp -n sim.vvp | grep -v "^VCD" | tail -${TAIL:-6}
+vvp -n sim.vvp $SIMARGS | grep -v "^VCD" | tail -${TAIL:-6}
