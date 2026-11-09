@@ -54,7 +54,13 @@ module CLK_1_MODULE (
     end
 
     assign sready = full & sidle & (scnt != 5'd16);
-    assign din    = buffer[scnt[3:0]];
+    reg  held;
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)                held <= 1'b0;
+        else if (sdone & ~sdone_q) held <= 1'b1;
+        else if (sidle)            held <= 1'b0;
+    end
+    assign din    = buffer[scnt[3:0] - (held & ~sidle)];
 endmodule
 
 // ------------------------------------------------------------------ CLK_2

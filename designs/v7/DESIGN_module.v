@@ -20,11 +20,11 @@ module CLK_1_MODULE (
     assign out_valid = sready;
     assign out_data  = din;
     assign flag_clk1_to_handshake = 1'b0;
-    // Ring of RING (14) words that rotates every cycle.  While in_valid is high the new word enters at the tail;
-    // afterwards the head recirculates.  The two oldest words are overwritten by words 14 and 15, which is
-    // safe because they have long been handed to the handshake by then (checked by a simulation assertion).
+    // Ring of RING (15) words that rotates every cycle.  While in_valid is high the new word enters at the tail;
+    // afterwards the head recirculates.  The oldest word is overwritten by word 15, which is safe because
+    // it has long been handed to the handshake by then (checked by a simulation assertion).
     // idx always points at the position of the next word to send.
-    localparam RING = 14;
+    localparam RING = 15;
     reg [31:0] r [0:RING-1];
     reg [4:0]  n;              // words received
     reg [4:0]  sc;             // words handed to the handshake
@@ -47,12 +47,22 @@ module CLK_1_MODULE (
     wire pending = (sc < n);
     wire accept  = sdone & ~sdone_q;
 
+    // din must stay stable until the destination request has been released: after the pop (sack seen) the old
+    // word is still presented while the handshake is busy, the new word appears together with sidle.
+    reg  held;
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)       held <= 1'b0;
+        else if (accept)  held <= 1'b1;
+        else if (sidle)   held <= 1'b0;
+    end
+    wire hold_prev = held & ~sidle;
+
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             n   <= 5'd0;
             sc  <= 5'd0;
             idx <= 4'd0;
-        end else if (sc == 5'd16) begin
+        end else if (sc == 5'd16 && sidle) begin
             n  <= 5'd0;
             sc <= 5'd0;
         end else begin
@@ -66,13 +76,14 @@ module CLK_1_MODULE (
     // simulation only: the word about to be overwritten must already have been sent
     // synopsys translate_off
     always @(posedge clk) begin
-        if (rst_n && in_valid && n >= RING && sc + RING < n + 1)
+        if (rst_n && in_valid && n >= RING && (sc <= n - RING || (sc == n - RING + 1 && hold_prev)))
             $display("[ASSERT] ring overrun at %0t", $time);
     end
     // synopsys translate_on
 
     assign sready = pending;
-    assign din    = r[idx];
+    wire [3:0] idx_p = (idx == 4'd0) ? RING - 1 : idx - 4'd1;   // previous word sits one position down
+    assign din    = r[hold_prev ? idx_p : idx];
 endmodule
 
 // ------------------------------------------------------------------ CLK_2

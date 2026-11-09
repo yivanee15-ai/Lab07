@@ -48,8 +48,18 @@ module CLK_1_MODULE (
     end
     wire pending = (sc < n);
     wire accept  = sdone & ~sdone_q;
+
+    // din must stay stable until the destination request has been released: after the pop (sack seen) the old
+    // word is still presented while the handshake is busy, the new word appears together with sidle.
+    reg  held;
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)       held <= 1'b0;
+        else if (accept)  held <= 1'b1;
+        else if (sidle)   held <= 1'b0;
+    end
+    wire hold_prev = held & ~sidle;
     // position of word "sc" inside the shift register: 16 - n + sc  (mod 16)
-    wire [3:0] idx = sc[3:0] - n[3:0];
+    wire [3:0] idx = sc[3:0] - hold_prev - n[3:0];
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
