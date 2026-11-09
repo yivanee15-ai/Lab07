@@ -1,31 +1,8 @@
 `timescale 1ns/1ps
-`ifndef CLK3_PERIOD
-  `define CLK3_PERIOD 20.7
-`endif
+`include "PATTERN.v"
+
 module TESTBED;
-    parameter CLK1_P = 14.1;
-    parameter CLK2_P = 10.1;
-    parameter CLK3_P = `CLK3_PERIOD;
-
-    // optional random initial clock phases:  +seed=<n>   (exercises different CDC alignments)
-    reg clk1 = 0, clk2 = 0, clk3 = 0;
-    integer seed;
-    real ph1, ph2, ph3;
-    initial begin
-        ph1 = 0; ph2 = 0; ph3 = 0;
-        if ($value$plusargs("seed=%d", seed)) begin
-            ph1 = ($urandom(seed) % 1000) / 1000.0 * CLK1_P;
-            ph2 = ($urandom % 1000) / 1000.0 * CLK2_P;
-            ph3 = ($urandom % 1000) / 1000.0 * CLK3_P;
-        end
-        fork
-            begin #ph1; forever #(CLK1_P/2.0) clk1 = ~clk1; end
-            begin #ph2; forever #(CLK2_P/2.0) clk2 = ~clk2; end
-            begin #ph3; forever #(CLK3_P/2.0) clk3 = ~clk3; end
-        join
-    end
-
-    wire        rst_n, in_valid, out_valid;
+    wire        clk1, clk2, clk3, rst_n, in_valid, out_valid;
     wire [31:0] in_data;
     wire [15:0] out_data;
 
@@ -36,7 +13,7 @@ module TESTBED;
     );
 
     PATTERN I_PATTERN (
-        .clk1(clk1), .clk3(clk3), .rst_n(rst_n),
+        .clk1(clk1), .clk2(clk2), .clk3(clk3), .rst_n(rst_n),
         .in_valid(in_valid), .in_data(in_data),
         .out_valid(out_valid), .out_data(out_data)
     );

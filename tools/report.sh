@@ -5,7 +5,7 @@ echo "| design | latency @20.7ns (ns) | logic area (Nangate45 um^2, SRAM excl.) 
 echo "|---|---|---|---|---|---|"
 base=""
 for d in $(ls -d $ROOT/designs/v* | xargs -n1 basename); do
-  lat=$(TAIL=6 $ROOT/tools/run_sim.sh designs/$d 20.7 100 2>&1 | grep LATENCY_NS | sed 's/.*avg=\([0-9.]*\) .*/\1/')
+  lat=$(TAIL=12 $ROOT/tools/run_sim.sh designs/$d 20.7 100 2>&1 | grep LATENCY_NS | sed 's/.*avg=\([0-9.]*\) .*/\1/')
   syn=$($ROOT/tools/synth_design.sh designs/$d 2>&1)
   area=$(echo "$syn" | grep "Chip area" | sed 's/.*: //')
   ff=$(echo "$syn" | grep -E "DFF" | awk '{s+=$NF} END{print s}')
