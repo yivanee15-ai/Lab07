@@ -1,3 +1,4 @@
+// SRAM: port A = write (CKA = wclk), port B = read (CKB = rclk, DOB).
 // Asynchronous FIFO (gray pointers, 2-FF synchronizers) on top of the TA dual-port SRAM.
 // Read data appears 1 rclk cycle after the pop: the SRAM is addressed with the NEXT head pointer, the
 // SRAM output is re-timed by one extra flop, and the empty flag is combinational (no extra latency).
@@ -69,24 +70,24 @@ module FIFO_syn #(parameter WIDTH = 16, parameter WORDS = 64) (
     wire [AW-1:0] raddr = rbin_nxt[AW-1:0];   // next head
 
     DUAL_64X16X1BM1 u_dual_sram (
-        .CKA(rclk), .CKB(wclk),
-        .WEAN(1'b1), .WEBN(~wen),
+        .CKA(wclk), .CKB(rclk),
+        .WEAN(~wen), .WEBN(1'b1),
         .CSA(1'b1), .CSB(1'b1),
         .OEA(1'b1), .OEB(1'b1),
-        .A0(raddr[0]), .A1(raddr[1]), .A2(raddr[2]), .A3(raddr[3]), .A4(raddr[4]), .A5(raddr[5]),
-        .B0(waddr[0]), .B1(waddr[1]), .B2(waddr[2]), .B3(waddr[3]), .B4(waddr[4]), .B5(waddr[5]),
-        .DIA0(1'b0), .DIA1(1'b0), .DIA2(1'b0), .DIA3(1'b0), .DIA4(1'b0), .DIA5(1'b0), .DIA6(1'b0), .DIA7(1'b0),
-        .DIA8(1'b0), .DIA9(1'b0), .DIA10(1'b0), .DIA11(1'b0), .DIA12(1'b0), .DIA13(1'b0), .DIA14(1'b0), .DIA15(1'b0),
-        .DIB0(wdata[0]), .DIB1(wdata[1]), .DIB2(wdata[2]), .DIB3(wdata[3]),
-        .DIB4(wdata[4]), .DIB5(wdata[5]), .DIB6(wdata[6]), .DIB7(wdata[7]),
-        .DIB8(wdata[8]), .DIB9(wdata[9]), .DIB10(wdata[10]), .DIB11(wdata[11]),
-        .DIB12(wdata[12]), .DIB13(wdata[13]), .DIB14(wdata[14]), .DIB15(wdata[15]),
-        .DOA0(sram_q[0]), .DOA1(sram_q[1]), .DOA2(sram_q[2]), .DOA3(sram_q[3]),
-        .DOA4(sram_q[4]), .DOA5(sram_q[5]), .DOA6(sram_q[6]), .DOA7(sram_q[7]),
-        .DOA8(sram_q[8]), .DOA9(sram_q[9]), .DOA10(sram_q[10]), .DOA11(sram_q[11]),
-        .DOA12(sram_q[12]), .DOA13(sram_q[13]), .DOA14(sram_q[14]), .DOA15(sram_q[15]),
-        .DOB0(), .DOB1(), .DOB2(), .DOB3(), .DOB4(), .DOB5(), .DOB6(), .DOB7(),
-        .DOB8(), .DOB9(), .DOB10(), .DOB11(), .DOB12(), .DOB13(), .DOB14(), .DOB15()
+        .A0(waddr[0]), .A1(waddr[1]), .A2(waddr[2]), .A3(waddr[3]), .A4(waddr[4]), .A5(waddr[5]),
+        .B0(raddr[0]), .B1(raddr[1]), .B2(raddr[2]), .B3(raddr[3]), .B4(raddr[4]), .B5(raddr[5]),
+        .DIA0(wdata[0]), .DIA1(wdata[1]), .DIA2(wdata[2]), .DIA3(wdata[3]),
+        .DIA4(wdata[4]), .DIA5(wdata[5]), .DIA6(wdata[6]), .DIA7(wdata[7]),
+        .DIA8(wdata[8]), .DIA9(wdata[9]), .DIA10(wdata[10]), .DIA11(wdata[11]),
+        .DIA12(wdata[12]), .DIA13(wdata[13]), .DIA14(wdata[14]), .DIA15(wdata[15]),
+        .DIB0(1'b0), .DIB1(1'b0), .DIB2(1'b0), .DIB3(1'b0), .DIB4(1'b0), .DIB5(1'b0), .DIB6(1'b0), .DIB7(1'b0),
+        .DIB8(1'b0), .DIB9(1'b0), .DIB10(1'b0), .DIB11(1'b0), .DIB12(1'b0), .DIB13(1'b0), .DIB14(1'b0), .DIB15(1'b0),
+        .DOA0(), .DOA1(), .DOA2(), .DOA3(), .DOA4(), .DOA5(), .DOA6(), .DOA7(),
+        .DOA8(), .DOA9(), .DOA10(), .DOA11(), .DOA12(), .DOA13(), .DOA14(), .DOA15(),
+        .DOB0(sram_q[0]), .DOB1(sram_q[1]), .DOB2(sram_q[2]), .DOB3(sram_q[3]),
+        .DOB4(sram_q[4]), .DOB5(sram_q[5]), .DOB6(sram_q[6]), .DOB7(sram_q[7]),
+        .DOB8(sram_q[8]), .DOB9(sram_q[9]), .DOB10(sram_q[10]), .DOB11(sram_q[11]),
+        .DOB12(sram_q[12]), .DOB13(sram_q[13]), .DOB14(sram_q[14]), .DOB15(sram_q[15])
     );
 
     // extra flop stage so the SRAM data is re-timed in the rclk domain

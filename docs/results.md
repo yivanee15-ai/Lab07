@@ -108,7 +108,7 @@ designs/vN/synchronizer/FIFO_syn.v         -> 01_RTL/synchronizer/FIFO_syn.v
    若 DC 的 clk2 路徑不過：先把 `F8_PIPE` 設 1（FRONT8 多一級）。
 5. 需要留意的結構風險（V3 起）：`FIFO_syn` 的 `rempty` 是組合邏輯（`rptr == wptr_s`）、SRAM 讀位址用 next-head pointer。
    若 Jasper / DC 對這兩點有意見，改回「registered rempty、位址 = rbin」即可（各多 1 個 clk3 cycle ≈ +21 ns latency，功能不變）。
-6. SRAM 假設為 `DUAL_64X16X1BM1`，port A 讀（CKA=rclk）、port B 寫（CKB=wclk），`WEAN/WEBN` active-low；
+6. SRAM 假設為 `DUAL_64X16X1BM1`，port A 寫（CKA=wclk）、port B 讀（CKB=rclk，輸出 DOB），已照 TA 的 FIFO_syn 模板，`WEAN/WEBN` active-low；
    FIFO 讀位址用 next-head，所以同位址讀寫時 SRAM 的 `MEM_Warning`（spec 已列為可接受）可能出現。
 
 ## 6. 復現指令

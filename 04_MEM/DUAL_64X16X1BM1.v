@@ -1,5 +1,5 @@
 // Behavioural stand-in for the TA SRAM DUAL_64X16X1BM1 (64 words x 16 bits, dual port)
-// Assumed Artisan-style interface: port A (read in FIFO), port B (write in FIFO), active-low WEAN/WEBN.
+// Assumed Artisan-style interface: port A (write in FIFO, CKA=wclk), port B (read in FIFO, CKB=rclk, DOB), active-low WEAN/WEBN.
 `timescale 1ns/1ps
 module DUAL_64X16X1BM1 (
     input  A0,
