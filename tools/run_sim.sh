@@ -4,8 +4,9 @@ D=${1:-designs/v1}; P=${2:-20.7}; N=${3:-100}
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 W=$ROOT/build/$(basename $D)_$P; mkdir -p $W; cd $W
 cp $ROOT/00_TESTBED/pattern_*.dat .
+grep -v 'fsdb' $ROOT/00_TESTBED/TESTBED.v > $W/TESTBED_sim.v
 iverilog -g2012 -o sim.vvp -DRTL -DCLK3_PERIOD=$P -DNPAT=$N \
-  -DRTL -I$ROOT/00_TESTBED $ROOT/00_TESTBED/TESTBED.v $ROOT/common/NTT_TOP.v \
+  -DRTL -I$ROOT/00_TESTBED -I$ROOT/common $W/TESTBED_sim.v \
   $ROOT/common/NDFF_syn.v $ROOT/common/NDFF_BUS_syn.v $ROOT/04_MEM/DUAL_64X16X1BM1.v \
   $ROOT/$D/DESIGN_MODULE.v $ROOT/$D/Handshake_syn.v $ROOT/$D/FIFO_syn.v || exit 1
 vvp -n sim.vvp $SIMARGS | grep -v "^VCD" | tail -${TAIL:-6}
