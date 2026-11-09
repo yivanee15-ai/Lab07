@@ -38,8 +38,15 @@ module CLK_1_MODULE (
         end
     end
 
+    // The word is popped when the acknowledge (sdone) is seen rising, so din stays stable from the moment the
+    // request is raised until the acknowledge has arrived (Jasper data-stability check on din).
+    reg  sdone_q;
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) sdone_q <= 1'b0;
+        else        sdone_q <= sdone;
+    end
     wire pending = (sc < n);
-    wire accept  = pending & sidle;
+    wire accept  = sdone & ~sdone_q;
     // position of word "sc" inside the shift register: 16 - n + sc  (mod 16)
     wire [3:0] idx = sc[3:0] - n[3:0];
 
