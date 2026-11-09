@@ -16,12 +16,18 @@ module Handshake_syn #(parameter WIDTH = 32) (
     input              sready,
     input  [WIDTH-1:0] din,
     output             sidle,
-    output             sdone,   // unused by this variant (kept for a common top level)
+    output             flag_handshake_to_clk1,   // carries the synchronised acknowledge (sack)
+    input              flag_clk1_to_handshake,
+    output             flag_handshake_to_clk2,
+    input              flag_clk2_to_handshake,
     // destination side (dclk)
     input              dbusy,
     output reg         dvalid,
     output reg [WIDTH-1:0] dout
 );
+    wire sdone;
+    assign flag_handshake_to_clk1 = sdone;
+    assign flag_handshake_to_clk2 = 1'b0;
     reg  sreq;
     wire dreq;
     wire dack;

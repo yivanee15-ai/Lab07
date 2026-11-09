@@ -2,7 +2,7 @@
 module MONRT;
   real tp; integer n=0; integer hist[0:40]; integer i; real d;
   initial for (i=0;i<41;i=i+1) hist[i]=0;
-  always @(posedge TESTBED.I_NTT.hs_dvalid) begin
+  always @(posedge TESTBED.I_NTT.in_data_valid_clk2) begin
     d = $realtime - tp;
     if (d < 400.0) begin i = d/10.1; if (i>40) i=40; hist[i] = hist[i]+1; end
     tp = $realtime;

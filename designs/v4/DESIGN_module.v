@@ -11,11 +11,19 @@ module CLK_1_MODULE (
     input         rst_n,
     input         in_valid,
     input  [31:0] in_data,
-    input         sidle,
-    input         sdone,
-    output        sready,
-    output [31:0] din
+    input         out_idle,                 // sidle of the handshake
+    output        out_valid,                // sready
+    output [31:0] out_data,                 // din
+    input         flag_handshake_to_clk1,   // synchronised acknowledge (sdone)
+    output        flag_clk1_to_handshake
 );
+    wire        sidle = out_idle;
+    wire        sdone = flag_handshake_to_clk1;
+    wire        sready;
+    wire [31:0] din;
+    assign out_valid = sready;
+    assign out_data  = din;
+    assign flag_clk1_to_handshake = 1'b0;
     // Ring of RING (14) words that rotates every cycle.  While in_valid is high the new word enters at the tail;
     // afterwards the head recirculates.  The two oldest words are overwritten by words 14 and 15, which is
     // safe because they have long been handed to the handshake by then (checked by a simulation assertion).
@@ -67,13 +75,28 @@ endmodule
 module CLK_2_MODULE (
     input         clk,
     input         rst_n,
-    input         dvalid,
-    input  [31:0] dout,
-    output        dbusy,
-    input         wfull,
-    output        winc,
-    output [15:0] wdata
+    input         in_valid,                 // dvalid
+    input  [31:0] in_data,                  // dout
+    input         fifo_full,                // wfull
+    output        out_valid,                // winc
+    output [15:0] out_data,                 // wdata
+    output        busy,                     // dbusy
+    input         flag_handshake_to_clk2,
+    output        flag_clk2_to_handshake,
+    input         flag_fifo_to_clk2,
+    output        flag_clk2_to_fifo
 );
+    wire        dvalid = in_valid;
+    wire [31:0] dout   = in_data;
+    wire        wfull  = fifo_full;
+    wire        winc;
+    wire [15:0] wdata;
+    wire        dbusy;
+    assign out_valid = winc;
+    assign out_data  = wdata;
+    assign busy      = dbusy;
+    assign flag_clk2_to_handshake = 1'b0;
+    assign flag_clk2_to_fifo      = 1'b0;
     // The radix-4 front end presents stream position q at tick 96+q (registered output -> seen at 97+q).
     // stages 3..6 : product/y register + output register (2 ticks); stage 7 : 1 tick, feeds the FIFO.
     localparam D3 = 97;
@@ -610,12 +633,19 @@ endmodule
 module CLK_3_MODULE (
     input         clk,
     input         rst_n,
-    input         rempty,
-    input  [15:0] rdata,
-    output        rinc,
+    input         fifo_empty,               // rempty
+    input  [15:0] fifo_rdata,               // rdata
+    output        fifo_rinc,                // rinc
     output        out_valid,
-    output [15:0] out_data
+    output [15:0] out_data,
+    input         flag_fifo_to_clk3,
+    output        flag_clk3_to_fifo
 );
+    wire        rempty = fifo_empty;
+    wire [15:0] rdata  = fifo_rdata;
+    wire        rinc;
+    assign fifo_rinc = rinc;
+    assign flag_clk3_to_fifo = 1'b0;
     reg v1;
     assign rinc = ~rempty;
     always @(posedge clk or negedge rst_n) begin

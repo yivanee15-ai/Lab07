@@ -11,8 +11,14 @@ module FIFO_syn #(parameter WIDTH = 16, parameter WORDS = 64) (
     // read side (rclk)
     input              rinc,
     output reg [WIDTH-1:0] rdata,
-    output reg         rempty
+    output reg         rempty,
+    output             flag_fifo_to_clk2,
+    input              flag_clk2_to_fifo,
+    output             flag_fifo_to_clk3,
+    input              flag_clk3_to_fifo
 );
+    assign flag_fifo_to_clk2 = 1'b0;
+    assign flag_fifo_to_clk3 = 1'b0;
     localparam AW = 6;   // log2(WORDS)
 
     reg  [AW:0] wbin, rbin;

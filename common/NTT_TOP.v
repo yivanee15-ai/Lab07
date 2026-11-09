@@ -1,45 +1,140 @@
-// Top level (assumed interface -- replace by the TA NTT_TOP when integrating).
+`include "DESIGN_module.v"
+`include "synchronizer/Handshake_syn.v"
+`include "synchronizer/FIFO_syn.v"
+`include "synchronizer/NDFF_syn.v"
+`include "synchronizer/NDFF_BUS_syn.v"
+
 module NTT_TOP (
-    input         clk1,
-    input         clk2,
-    input         clk3,
-    input         rst_n,
-    input         in_valid,
-    input  [31:0] in_data,
-    output        out_valid,
-    output [15:0] out_data
+	// Input signals
+	clk1,
+	clk2,
+	clk3,
+	rst_n,
+	in_valid,
+	in_data,
+	//  Output signals
+	out_valid,
+	out_data
 );
-    wire        hs_sready, hs_sidle, hs_sdone, hs_dbusy, hs_dvalid;
-    wire [31:0] hs_din, hs_dout;
-    wire        f_winc, f_wfull, f_rinc, f_rempty;
-    wire [15:0] f_wdata, f_rdata;
+//---------------------------------------------------------------------
+//   PORT DECLARATION          
+//---------------------------------------------------------------------		
+input         clk1; 
+input         clk2;
+input         clk3;			
+input         rst_n;
+input         in_valid;
+input  [31:0] in_data;
+output        out_valid;
+output [15:0] out_data; 	
 
-    CLK_1_MODULE u_clk1 (
-        .clk(clk1), .rst_n(rst_n), .in_valid(in_valid), .in_data(in_data),
-        .sidle(hs_sidle), .sdone(hs_sdone), .sready(hs_sready), .din(hs_din)
-    );
+//---------------------------------------------------------------------
+//   REG & WIRE
+//---------------------------------------------------------------------
+wire        sidle;
+wire        data_valid_clk1;
+wire [31:0] data_clk1;
+wire        in_data_valid_clk2;
+wire [31:0] in_data_clk2;
+wire        mul_busy;
+wire        out_data_valid_clk2;
+wire [15:0] out_data_clk2;
+wire        fifo_full;
+wire        fifo_empty;
+wire        fifo_rinc;
+wire [15:0] fifo_rdata; 
 
-    Handshake_syn #(.WIDTH(32)) u_Handshake_syn (
-        .sclk(clk1), .dclk(clk2), .rst_n(rst_n),
-        .sready(hs_sready), .din(hs_din), .sidle(hs_sidle), .sdone(hs_sdone),
-        .dbusy(hs_dbusy), .dvalid(hs_dvalid), .dout(hs_dout)
-    );
+// Custom flags to use if needed
+wire flag_handshake_to_clk1;
+wire flag_clk1_to_handshake;
 
-    CLK_2_MODULE u_clk2 (
-        .clk(clk2), .rst_n(rst_n),
-        .dvalid(hs_dvalid), .dout(hs_dout), .dbusy(hs_dbusy),
-        .wfull(f_wfull), .winc(f_winc), .wdata(f_wdata)
-    );
+wire flag_handshake_to_clk2;
+wire flag_clk2_to_handshake;
 
-    FIFO_syn #(.WIDTH(16), .WORDS(64)) u_FIFO_syn (
-        .wclk(clk2), .rclk(clk3), .rst_n(rst_n),
-        .winc(f_winc), .wdata(f_wdata), .wfull(f_wfull),
-        .rinc(f_rinc), .rdata(f_rdata), .rempty(f_rempty)
-    );
+wire flag_fifo_to_clk2;
+wire flag_clk2_to_fifo;
 
-    CLK_3_MODULE u_clk3 (
-        .clk(clk3), .rst_n(rst_n),
-        .rempty(f_rempty), .rdata(f_rdata), .rinc(f_rinc),
-        .out_valid(out_valid), .out_data(out_data)
-    );
+wire flag_fifo_to_clk3;
+wire flag_clk3_to_fifo;
+
+CLK_1_MODULE u_input (
+    .clk (clk1),
+    .rst_n (rst_n),
+    .in_valid (in_valid),
+    .in_data (in_data),
+    .out_idle (sidle),
+    .out_valid (data_valid_clk1),
+    .out_data (data_clk1),
+
+    .flag_handshake_to_clk1(flag_handshake_to_clk1),
+    .flag_clk1_to_handshake(flag_clk1_to_handshake)
+);
+
+
+Handshake_syn #(32) u_Handshake_syn (
+    .sclk (clk1),
+    .dclk (clk2),
+    .rst_n (rst_n),
+    .sready (data_valid_clk1),
+    .din (data_clk1),
+    .dbusy (mul_busy),
+    .sidle (sidle),
+    .dvalid (in_data_valid_clk2),
+    .dout (in_data_clk2),
+
+    .flag_handshake_to_clk1(flag_handshake_to_clk1),
+    .flag_clk1_to_handshake(flag_clk1_to_handshake),
+
+    .flag_handshake_to_clk2(flag_handshake_to_clk2),
+    .flag_clk2_to_handshake(flag_clk2_to_handshake)
+);
+
+CLK_2_MODULE u_NTT (
+	.clk (clk2),
+    .rst_n (rst_n),
+    .in_valid (in_data_valid_clk2),
+    .in_data (in_data_clk2),
+    .fifo_full (fifo_full),
+    .out_valid (out_data_valid_clk2),
+    .out_data (out_data_clk2),
+    .busy (mul_busy),
+
+    .flag_handshake_to_clk2(flag_handshake_to_clk2),
+    .flag_clk2_to_handshake(flag_clk2_to_handshake),
+
+    .flag_fifo_to_clk2(flag_fifo_to_clk2),
+    .flag_clk2_to_fifo(flag_clk2_to_fifo)
+);
+
+FIFO_syn #(.WIDTH(16), .WORDS(64)) u_FIFO_syn (
+    .wclk (clk2),
+    .rclk (clk3),
+    .rst_n (rst_n),
+    .winc (out_data_valid_clk2),
+    .wdata (out_data_clk2),
+    .wfull (fifo_full),
+    .rinc (fifo_rinc),
+    .rdata (fifo_rdata),
+    .rempty (fifo_empty),
+
+    .flag_fifo_to_clk2(flag_fifo_to_clk2),
+    .flag_clk2_to_fifo(flag_clk2_to_fifo),
+
+    .flag_fifo_to_clk3(flag_fifo_to_clk3),
+	.flag_clk3_to_fifo(flag_clk3_to_fifo)
+);
+
+CLK_3_MODULE u_output (
+    .clk (clk3),
+    .rst_n (rst_n),
+    .fifo_empty (fifo_empty),
+    .fifo_rdata (fifo_rdata),
+    .fifo_rinc (fifo_rinc),
+    .out_valid (out_valid),
+    .out_data (out_data),
+
+    .flag_fifo_to_clk3(flag_fifo_to_clk3),
+	.flag_clk3_to_fifo(flag_clk3_to_fifo)
+);
+
 endmodule

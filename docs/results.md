@@ -89,19 +89,21 @@
 | CLK_1 ring 縮成 13 word 以下 | word 2 在最慢的標準 handshake 下來不及送出，會被蓋掉（14 已是各版本通用的安全值） |
 | 去掉 Handshake 的 source data register | din 隨 ring 位置變化時 mux 可能有 glitch，與 dest 取樣撞到 → 不安全 |
 
-## 5. 整合到真正的作業環境（請照做）
+## 5. 整合到真正的作業環境（已對齊 TA 的 NTT_TOP.v）
 
-1. （已完成）真正的 `GMb.txt` 已放在 `00_TESTBED/GMb.txt`，所有 `designs/v*` 的 ROM 與 pattern 都已用它重生並通過 regression。若 TA 更新檔案，重跑：
-   ```bash
-   python3 tools/gen_pattern.py --gmb <TA>/00_TESTBED/GMb.txt --n 100     # 重生 pattern（golden 用真 GMb）
-   python3 tools/gen_rom.py <TA>/00_TESTBED/GMb.txt designs/v5/DESIGN_MODULE.v   # 重寫 ROM / 前端常數表
-   ```
-   `gen_rom.py` 會重寫 `DESIGN_MODULE.v` 裡 `BEGIN_GMB_ROM / BEGIN_F4_LUT / BEGIN_F8_LUT` 區塊；`GMb.txt` 格式假設為每行一個整數（128 行含 index 0，或 127 行）。
-2. 比對 TA 的 `NTT_TOP.v` 與 `CLK_1/2/3_MODULE`、`Handshake_syn`、`FIFO_syn` 的 port 名稱：我的介面見 `common/NTT_TOP.v`
-   （`CLK_1_MODULE(clk, rst_n, in_valid, in_data, sidle, sdone, sready, din)`、`CLK_2_MODULE(clk, rst_n, dvalid, dout, dbusy, wfull, winc, wdata)`、
-   `CLK_3_MODULE(clk, rst_n, rempty, rdata, rinc, out_valid, out_data)`）。
-   需要保留 TA 的 module / signal 名稱（Jasper 腳本的 `-map` 用 `din/sreq/dreq/dack/sack` 與 `wptr/rptr/wfull/rempty/winc/rinc/wdata/rdata`）。
-3. 交作業的三個檔案 = 選定版本資料夾裡的 `DESIGN_MODULE.v`、`Handshake_syn.v`、`FIFO_syn.v`（`NDFF_syn / NDFF_BUS_syn` 用 TA 的）。
+`common/NTT_TOP.v` 現在就是 TA 的檔案原樣；`designs/vN/` 的結構與作業一致：
+
+```
+designs/vN/DESIGN_module.v                 -> 01_RTL/DESIGN_module.v
+designs/vN/synchronizer/Handshake_syn.v    -> 01_RTL/synchronizer/Handshake_syn.v
+designs/vN/synchronizer/FIFO_syn.v         -> 01_RTL/synchronizer/FIFO_syn.v
+```
+
+1. 只要把這三個檔案複製到 TA 範本對應位置（`NDFF_syn.v`、`NDFF_BUS_syn.v`、`NTT_TOP.v`、`TESTBED.v` 用 TA 的）。
+   我的模組 port 已照 TA 的 `NTT_TOP.v` 命名（含 `flag_*`）。`NDFF_syn` 我假設 port 是 `.D .Q .clk .rst_n`、`NDFF_BUS_syn #(WIDTH)` 同樣，**請對照 TA 的實際檔案**。
+2. flag 的用法：`flag_handshake_to_clk1` 用來把 Handshake 同步後的 acknowledge 帶回 CLK_1（V1、V7 會用到），其餘 flag 固定接 0。
+3. `GMb.txt` 已用 TA 真檔重生所有 ROM 與 pattern；若更新檔案，重跑
+   `python3 tools/gen_rom.py <GMb.txt> designs/v5/DESIGN_module.v`。
 4. 必跑：`01_run_vcs_rtl`（4 種 clk3）→ `01_run_dc_shell`（slack ≥ 0、無 latch/error）→ `02_run_pt` → `03_run_vcs_gate` → `05_JG/01_run_jg`。
    若 DC 的 clk2 路徑不過：先把 `F8_PIPE` 設 1（FRONT8 多一級）。
 5. 需要留意的結構風險（V3 起）：`FIFO_syn` 的 `rempty` 是組合邏輯（`rptr == wptr_s`）、SRAM 讀位址用 next-head pointer。
