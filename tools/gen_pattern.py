@@ -21,9 +21,7 @@ def main():
     if a.gmb:
         gmb = read_gmb(a.gmb)
     else:
-        gmb = make_gmb()
-        with open(os.path.join(a.out, "GMb.txt"), "w") as f:
-            f.write("\n".join(str(v) for v in gmb) + "\n")
+        gmb = read_gmb(os.path.join(a.out, "GMb.txt"))   # TA table (00_TESTBED/GMb.txt)
     pats = [[0] * 128, [15] * 128, [1] + [0] * 127, [0] * 127 + [15],
             [(i * 7 + 3) % 16 for i in range(128)], [i % 16 for i in range(128)]]
     for i in range(0, 128, 9):  # single impulses
@@ -44,7 +42,8 @@ def main():
 
 
 def read_gmb(path):
-    toks = open(path).read().split()
+    toks = [l.split('//')[0] for l in open(path).read().splitlines()]
+    toks = ' '.join(toks).split()
     vals = []
     for t in toks:
         t = t.lower()

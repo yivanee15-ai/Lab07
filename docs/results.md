@@ -91,7 +91,7 @@
 
 ## 5. 整合到真正的作業環境（請照做）
 
-1. 解壓 TA 的 tar 後，把真正的 `GMb.txt` 放進來重生資料：
+1. （已完成）真正的 `GMb.txt` 已放在 `00_TESTBED/GMb.txt`，所有 `designs/v*` 的 ROM 與 pattern 都已用它重生並通過 regression。若 TA 更新檔案，重跑：
    ```bash
    python3 tools/gen_pattern.py --gmb <TA>/00_TESTBED/GMb.txt --n 100     # 重生 pattern（golden 用真 GMb）
    python3 tools/gen_rom.py <TA>/00_TESTBED/GMb.txt designs/v5/DESIGN_MODULE.v   # 重寫 ROM / 前端常數表
