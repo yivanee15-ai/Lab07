@@ -49,17 +49,8 @@ module CLK_1_MODULE (
     wire pending = (sc < n);
     wire accept  = sdone & ~sdone_q;
 
-    // din must stay stable until the destination request has been released: after the pop (sack seen) the old
-    // word is still presented while the handshake is busy, the new word appears together with sidle.
-    reg  held;
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n)       held <= 1'b0;
-        else if (accept)  held <= 1'b1;
-        else if (sidle)   held <= 1'b0;
-    end
-    wire hold_prev = held & ~sidle;
     // position of word "sc" inside the shift register: 16 - n + sc  (mod 16)
-    wire [3:0] idx = sc[3:0] - hold_prev - n[3:0];
+    wire [3:0] idx = sc[3:0] - n[3:0];
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -75,7 +66,15 @@ module CLK_1_MODULE (
     end
 
     assign sready = pending;
-    assign din    = sr[idx];
+    wire [31:0] din_nxt;
+    assign din_nxt = sr[idx];
+    // din is the next word while the handshake is idle and a registered copy of it as soon as a transfer is
+    // running, so din cannot change between the request and the end of the 4-phase handshake whatever the
+    // input does (Jasper data-stability check).  No extra latency: the first idle cycle already shows the new word.
+    reg  [31:0] dr;
+    always @(posedge clk) dr <= din;
+    assign din = sidle ? din_nxt : dr;
+
 endmodule
 
 // ------------------------------------------------------------------ CLK_2

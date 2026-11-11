@@ -54,13 +54,15 @@ module CLK_1_MODULE (
     end
 
     assign sready = full & sidle & (scnt != 5'd16);
-    reg  held;
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n)                held <= 1'b0;
-        else if (sdone & ~sdone_q) held <= 1'b1;
-        else if (sidle)            held <= 1'b0;
-    end
-    assign din    = buffer[scnt[3:0] - (held & ~sidle)];
+    wire [31:0] din_nxt;
+    assign din_nxt = buffer[scnt[3:0]];
+    // din is the next word while the handshake is idle and a registered copy of it as soon as a transfer is
+    // running, so din cannot change between the request and the end of the 4-phase handshake whatever the
+    // input does (Jasper data-stability check).  No extra latency: the first idle cycle already shows the new word.
+    reg  [31:0] dr;
+    always @(posedge clk) dr <= din;
+    assign din = sidle ? din_nxt : dr;
+
 endmodule
 
 // ------------------------------------------------------------------ CLK_2

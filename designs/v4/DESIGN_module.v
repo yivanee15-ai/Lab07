@@ -50,15 +50,6 @@ module CLK_1_MODULE (
     wire pending = (sc < n);
     wire accept  = sdone & ~sdone_q;
 
-    // din must stay stable until the destination request has been released: after the pop (sack seen) the old
-    // word is still presented while the handshake is busy, the new word appears together with sidle.
-    reg  held;
-    always @(posedge clk or negedge rst_n) begin
-        if (!rst_n)       held <= 1'b0;
-        else if (accept)  held <= 1'b1;
-        else if (sidle)   held <= 1'b0;
-    end
-    wire hold_prev = held & ~sidle;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -79,14 +70,21 @@ module CLK_1_MODULE (
     // simulation only: the word about to be overwritten must already have been sent
     // synopsys translate_off
     always @(posedge clk) begin
-        if (rst_n && in_valid && n >= RING && (sc <= n - RING || (sc == n - RING + 1 && hold_prev)))
+        if (rst_n && in_valid && n >= RING && (sc <= n - RING))
             $display("[ASSERT] ring overrun at %0t", $time);
     end
     // synopsys translate_on
 
     assign sready = pending;
-    wire [3:0] idx_p = (idx == 4'd0) ? RING - 1 : idx - 4'd1;   // previous word sits one position down
-    assign din    = r[hold_prev ? idx_p : idx];
+    wire [31:0] din_nxt;
+    assign din_nxt = r[idx];
+    // din is the next word while the handshake is idle and a registered copy of it as soon as a transfer is
+    // running, so din cannot change between the request and the end of the 4-phase handshake whatever the
+    // input does (Jasper data-stability check).  No extra latency: the first idle cycle already shows the new word.
+    reg  [31:0] dr;
+    always @(posedge clk) dr <= din;
+    assign din = sidle ? din_nxt : dr;
+
 endmodule
 
 // ------------------------------------------------------------------ CLK_2
